@@ -1,0 +1,124 @@
+﻿@page "/"
+@using DataLibrary
+@using Data
+@using Microsoft.Extensions.Configuration
+@inject IDataAccess _data
+@inject IConfiguration _config
+@attribute [Authorize(Roles = "Admin, Normal")]
+
+@using ChartJs.Blazor
+@using ChartJs.Blazor.LineChart
+@using ChartJs.Blazor.Common
+@using ChartJs.Blazor.Common.Axes
+@using ChartJs.Blazor.Common.Axes.Ticks
+@using ChartJs.Blazor.Common.Enums
+@using ChartJs.Blazor.Common.Handlers
+@using ChartJs.Blazor.Common.Time
+@using ChartJs.Blazor.Util
+@using ChartJs.Blazor.Interop
+
+@if (error)
+{
+    <p><em>An error occurred while loading the data from the database.</em></p>
+}
+else if (data == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <tr class="thead-light">
+            <th>ID</th>
+            <th>Timestamp</th>
+            <th>Count</th>
+        </tr>
+        @foreach (var p in data)
+        {
+            <tr>
+                <td>@p.id</td>
+                <td>@p.timestamp</td>
+                <td>@p.count</td>
+            </tr>
+        }
+    </table>
+    <Chart Config="lineConfig"></Chart>
+}
+@code {
+    List<PlayercountModel> data;
+    bool error = false;
+    LineConfig lineConfig;
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        string sql = "SELECT * FROM pc_count";
+        try
+        {
+            data = await _data.LoadDataAsync<PlayercountModel, dynamic>(sql, new { }, _config.GetConnectionString("MinecraftDatabase"));
+            lineConfig = new LineConfig
+            {
+                Options = new LineOptions
+                {
+                    Responsive = true,
+                    Title = new OptionsTitle
+                    {
+                        Display = true,
+                        Text = "Playercounts over time"
+                    },
+                    Tooltips = new Tooltips
+                    {
+                        Mode = InteractionMode.Nearest,
+                        Intersect = true
+                    },
+                    Hover = new Hover
+                    {
+                        Mode = InteractionMode.Nearest,
+                        Intersect = true
+                    },
+                    Scales = new Scales
+                    {
+                        XAxes = new List<CartesianAxis>
+                        {
+                            new CategoryAxis
+                            {
+                                ScaleLabel = new ScaleLabel
+                                {
+                                    LabelString = "Timestamp"
+                                }
+                            }
+                        },
+                        YAxes = new List<CartesianAxis>
+                        {
+                            new LinearCartesianAxis
+                            {
+                                ScaleLabel = new ScaleLabel
+                                {
+                                    LabelString = "Count"
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            IDataset<int> dataset = new LineDataset<int>()
+            {
+                Label = "Player Counts",
+                BackgroundColor = ColorUtil.RandomColorString(),
+                BorderColor = ColorUtil.RandomColorString(),
+                Fill = FillingMode.Disabled
+            };
+            foreach (var item in data)
+            {
+                dataset.Add(item.count);
+                lineConfig.Data.Labels.Add(item.timestamp.ToString());
+            }
+            lineConfig.Data.Datasets.Add(dataset);
+        }
+        catch (Exception)
+        {
+            error = true;
+        }
+    }
+}
